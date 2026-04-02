@@ -1,0 +1,8 @@
+* text=auto
+*.py text diff=python
+
+# Exclude from release archives
+.github/ export-ignore
+tests/ export-ignore
+README.md export-ignore
+LICENSE export-ignore
