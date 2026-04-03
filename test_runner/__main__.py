@@ -50,7 +50,7 @@ def main():
                     failures.append(result)
 
     if failures:
-        print(f"\n{'─' * 60}")
+        print(f"\n{'-' * 60}")
         for result in failures:
             print(f"\n{FAIL} {result['title']}")
             if result["error"]:
