@@ -5,18 +5,10 @@ on:
     tags: ["v*"]
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            name: linux
-          - os: macos-latest
-            name: macos
-          - os: windows-latest
-            name: windows
-
-    runs-on: ${{ matrix.os }}
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -26,43 +18,13 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Install
+        run: pip install -e .
+
       - name: Run tests
-        run: python -m test_runner tests
-        env:
-          PYTHONPATH: .
-
-      - name: Build self-contained package
-        run: pip install . --target=dist/
-
-      - name: Package release (Linux/macOS)
-        if: runner.os != 'Windows'
-        run: cd dist && zip -r ../test-runner-${{ matrix.name }}.zip . -x '*__pycache__*' '*.dist-info/*'
-
-      - name: Package release (Windows)
-        if: runner.os == 'Windows'
-        run: cd dist; Compress-Archive -Path * -DestinationPath ../test-runner-${{ matrix.name }}.zip
-        shell: pwsh
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-runner-${{ matrix.name }}
-          path: test-runner-${{ matrix.name }}.zip
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
+        run: python run tests
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: artifacts/*/test-runner-*.zip

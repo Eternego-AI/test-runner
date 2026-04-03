@@ -1,42 +1,29 @@
 # Test Runner
 
-Minimal Python test runner. Discovers files, runs functions, reports results.
+Minimal Python test runner. No framework imports. No decorators. Just functions and `assert`.
 
 ## Philosophy
 
-- Tests are plain Python — just functions and `assert`
+- Tests are plain Python — `def test_*` or `async def test_*`
 - Zero imports from the runner in test files
-- Any `test_*` function in any `*_test.py` file is a test
+- `def` tests run sequentially, `async def` tests run concurrently
 - The runner is a tool, not a dependency of your project
 
-## Installation
-
-Download the latest release for your OS from [Releases](https://github.com/Eternego-AI/test-runner/releases).
-
-### Linux / macOS
+## Install
 
 ```bash
-curl -sL https://github.com/Eternego-AI/test-runner/releases/latest/download/test-runner-linux.zip -o test-runner.zip
-unzip -qo test-runner.zip -d /tmp/test-runner
+pip install git+https://github.com/Eternego-AI/test-runner.git
 ```
 
-#### or macOS:
+Update:
 
 ```bash
-curl -sL https://github.com/Eternego-AI/test-runner/releases/latest/download/test-runner-macos.zip -o test-runner.zip
-unzip -qo test-runner.zip -d /tmp/test-runner
-```
-
-### Windows
-
-```powershell
-Invoke-WebRequest https://github.com/Eternego-AI/test-runner/releases/latest/download/test-runner-windows.zip -OutFile test-runner.zip
-Expand-Archive -Path test-runner.zip -DestinationPath $env:TEMP\test-runner -Force
+pip install --upgrade git+https://github.com/Eternego-AI/test-runner.git
 ```
 
 ## Usage
 
-Write tests as plain Python files:
+Write tests:
 
 ```python
 # tests/math_test.py
@@ -44,47 +31,93 @@ Write tests as plain Python files:
 def test_addition():
     assert 1 + 1 == 2
 
-def test_strings():
-    assert "hello".upper() == "HELLO"
+async def test_fetch():
+    result = await fetch("/api")
+    assert result.status == 200
 ```
 
-Run them:
-
-### Linux / macOS
+Run:
 
 ```bash
-PYTHONPATH="/tmp/test-runner:." python -m test_runner tests
+test-runner
+test-runner tests/core
+test-runner tests/math_test.py
 ```
 
-### Windows
+## Sync vs Async
 
-```powershell
-$env:PYTHONPATH = "$env:TEMP\test-runner;."
-python -m test_runner tests
+`def` tests run one at a time, in definition order. Use for tests that share state.
+
+`async def` tests run concurrently. Use for independent tests.
+
+```python
+# Sequential — shares state
+def test_create():
+    setup_db()
+    assert db.count() == 1
+
+def test_verify():
+    assert db.count() == 1
+
+# Concurrent — independent
+async def test_users():
+    assert await fetch("/users")
+
+async def test_posts():
+    assert await fetch("/posts")
 ```
 
 ## Features
 
 - Discovers `*_test.py` files recursively
 - Runs `test_*` functions in definition order
-- Supports `async def test_*` functions
-- Groups output by directory
-- Shows tracebacks on failure
-- Warns on empty test files (no `test_*` functions)
+- `def`: sequential, `async def`: concurrent
+- Live tree output with execution time
+- Tracebacks on failure
+- Event-driven — subscribe to signals for custom output
+- Usable as a CLI tool or as a library
 
-## Output
+## As a Library
+
+```python
+from source import tester
+
+outcome = await tester.directory("tests")
+print(outcome.success)   # True/False
+print(outcome.message)   # "305 tests: 305 passed, 0 failed, 0 errors"
+
+outcome = await tester.file("tests/math_test.py")
+outcome = await tester.test(my_function)
+```
+
+## Custom Output
+
+```python
+from source.platform.observer import Event, subscribe
+
+def on_complete(signal: Event):
+    if signal.title == "Test complete":
+        r = signal.details["result"]
+        print(f"{r['title']}: {r['status']} ({r['time']}s)")
+
+subscribe(on_complete)
+```
+
+## Architecture
 
 ```
-math/
-  arithmetic_test.py
-    PASS  addition works
-    PASS  subtraction works
-  string_test.py
-    PASS  uppercase
-    FAIL  lowercase
-           Expected 'hello', got 'HELLO'
-
-4 tests: 3 passed, 1 failed, 0 errors
+source/
+  tester.py        — business: directory(), file(), test() -> Outcome
+  cli.py           — entry point for test-runner command
+  core/
+    discover.py    — find test files and functions
+    execute.py     — run function, capture result and time
+    bus.py         — signal dispatch
+  platform/
+    observer.py    — event subscription system
+    filesystem.py  — file discovery
+shell/
+  cli.py           — live terminal output via rich
 ```
 
 ## License
